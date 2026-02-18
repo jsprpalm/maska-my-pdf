@@ -79,6 +79,12 @@ export default function PdfEditor({ file, onReset }: PdfEditorProps) {
       canvas.width = viewport.width;
       canvas.height = viewport.height;
 
+      // Resize overlay BEFORE setPageMeta so the drawing effect
+      // always runs after the canvas is cleared and properly sized
+      const overlay = overlayRef.current!;
+      overlay.width = viewport.width;
+      overlay.height = viewport.height;
+
       setPageMeta({
         width: page.getViewport({ scale: 1 }).width,
         height: page.getViewport({ scale: 1 }).height,
@@ -86,12 +92,6 @@ export default function PdfEditor({ file, onReset }: PdfEditorProps) {
       });
 
       await page.render({ canvasContext: ctx, viewport }).promise;
-
-      // Size overlay canvas
-      const overlay = overlayRef.current!;
-      overlay.width = viewport.width;
-      overlay.height = viewport.height;
-
       setIsRendering(false);
     };
 
