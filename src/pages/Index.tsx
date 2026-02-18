@@ -44,10 +44,15 @@ export default function Index() {
           </div>
           <span className="font-bold text-lg tracking-tight">Maska</span>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium bg-muted rounded-full px-3 py-1.5">
+        <a
+          href="https://github.com/jsprpalm/maska-my-pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium bg-muted rounded-full px-3 py-1.5 hover:bg-muted/80 transition-colors"
+        >
           <span className="w-1.5 h-1.5 rounded-full bg-stamp inline-block" />
           Klientbaserat · Open source
-        </div>
+        </a>
       </nav>
 
       {/* Hero */}
