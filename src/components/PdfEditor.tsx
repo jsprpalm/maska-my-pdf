@@ -105,12 +105,16 @@ export default function PdfEditor({ file, onReset }: PdfEditorProps) {
     const ctx = overlay.getContext("2d")!;
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-    // Existing rects for this page
+    // Existing rects for this page — recalculate canvas coords from PDF points using current scale
     ctx.fillStyle = "#000000";
     rects
       .filter((r) => r.pageIndex === currentPage)
       .forEach((r) => {
-        ctx.fillRect(r.canvasX, r.canvasY, r.canvasWidth, r.canvasHeight);
+        const cx = r.x * pageMeta.scale;
+        const cy = (pageMeta.height - r.y - r.height) * pageMeta.scale;
+        const cw = r.width * pageMeta.scale;
+        const ch = r.height * pageMeta.scale;
+        ctx.fillRect(cx, cy, cw, ch);
       });
 
     // In-progress drawing
