@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/favicon.png" alt="Maska-banner" style="width:300px"/>
+</p>
+
 # Maska
 
 A privacy-focused PDF redaction tool that runs entirely in your browser. Upload a PDF, draw black masks over sensitive information, and download the redacted version — no data ever leaves your device.
