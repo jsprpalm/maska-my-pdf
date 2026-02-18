@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { Download, Trash2, Undo2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,14 +53,12 @@ export default function PdfEditor({ file, onReset }: PdfEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const originalBytes = useRef<ArrayBuffer | null>(null);
 
   // Load the PDF
   useEffect(() => {
     const loadPdf = async () => {
       const bytes = await file.arrayBuffer();
-      originalBytes.current = bytes;
-      const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+      const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
       setPdfDoc(doc);
       setTotalPages(doc.numPages);
       setCurrentPage(1);
@@ -221,25 +219,57 @@ export default function PdfEditor({ file, onReset }: PdfEditorProps) {
   }, []);
 
   const downloadRedacted = useCallback(async () => {
-    if (!originalBytes.current || !pdfDoc) return;
+    if (!pdfDoc) return;
     setIsDownloading(true);
     try {
-      const pdfLibDoc = await PDFDocument.load(originalBytes.current.slice(0));
-      const pages = pdfLibDoc.getPages();
+      const newPdf = await PDFDocument.create();
+      const renderScale = 2; // High-res render for quality
 
-      for (const rect of rects) {
-        const page = pages[rect.pageIndex - 1];
-        page.drawRectangle({
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-          color: rgb(0, 0, 0),
-          opacity: 1,
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: renderScale });
+
+        // Render page to an offscreen canvas
+        const offscreen = document.createElement("canvas");
+        offscreen.width = viewport.width;
+        offscreen.height = viewport.height;
+        const ctx = offscreen.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Bake in redaction rectangles for this page
+        const pageRects = rects.filter((r) => r.pageIndex === pageNum);
+        if (pageRects.length > 0) {
+          // We need page dimensions in PDF points to recalculate canvas coords at renderScale
+          const pointViewport = page.getViewport({ scale: 1 });
+          ctx.fillStyle = "#000000";
+          for (const r of pageRects) {
+            // r coords are in PDF points; convert to renderScale canvas pixels
+            // PDF origin is bottom-left; canvas origin is top-left
+            const cx = r.x * renderScale;
+            const cy = (pointViewport.height - r.y - r.height) * renderScale;
+            const cw = r.width * renderScale;
+            const ch = r.height * renderScale;
+            ctx.fillRect(cx, cy, cw, ch);
+          }
+        }
+
+        // Export canvas as PNG and embed in new PDF
+        const pngDataUrl = offscreen.toDataURL("image/png");
+        const pngBytes = await fetch(pngDataUrl).then((r) => r.arrayBuffer());
+        const pngImage = await newPdf.embedPng(pngBytes);
+
+        // Add page with same dimensions as original
+        const pointViewport = page.getViewport({ scale: 1 });
+        const newPage = newPdf.addPage([pointViewport.width, pointViewport.height]);
+        newPage.drawImage(pngImage, {
+          x: 0,
+          y: 0,
+          width: pointViewport.width,
+          height: pointViewport.height,
         });
       }
 
-      const pdfBytes = await pdfLibDoc.save();
+      const pdfBytes = await newPdf.save();
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -250,7 +280,7 @@ export default function PdfEditor({ file, onReset }: PdfEditorProps) {
     } finally {
       setIsDownloading(false);
     }
-  }, [rects, pdfDoc, file]);
+  }, [rects, pdfDoc, totalPages, file]);
 
   const pageRectCount = rects.filter((r) => r.pageIndex === currentPage).length;
   const totalRectCount = rects.length;
