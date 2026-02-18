@@ -33,4 +33,4 @@ The dev server starts at `http://localhost:8080`.
 
 ## License
 
-This project is open source.
+[MIT](LICENSE)
